@@ -1,0 +1,104 @@
+module.exports = {
+  // User roles
+  USER_ROLES: {
+    ADMIN: 'ADMIN',
+    TUTOR: 'TUTOR',
+    PARENT: 'PARENT',
+    SUPERVISOR: 'SUPERVISOR',
+  },
+
+  // Account status
+  ACCOUNT_STATUS: {
+    PENDING: 'PENDING',
+    ACTIVE: 'ACTIVE',
+    SUSPENDED: 'SUSPENDED',
+    INACTIVE: 'INACTIVE',
+  },
+
+  // Tutor verification status
+  TUTOR_VERIFICATION: {
+    PENDING_DOCUMENTS: 'PENDING_DOCUMENTS',
+    DOCUMENTS_SUBMITTED: 'DOCUMENTS_SUBMITTED',
+    INTERVIEW_SCHEDULED: 'INTERVIEW_SCHEDULED',
+    INTERVIEW_COMPLETED: 'INTERVIEW_COMPLETED',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+  },
+
+  // Session status
+  SESSION_STATUS: {
+    PENDING_MATCH: 'PENDING_MATCH',
+    TUTOR_MATCHED: 'TUTOR_MATCHED',
+    CONFIRMED: 'CONFIRMED',
+    SCHEDULED: 'SCHEDULED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    COMPLETED: 'COMPLETED',
+    CANCELLED: 'CANCELLED',
+  },
+
+  // Match request status
+  MATCH_REQUEST_STATUS: {
+    PENDING: 'PENDING',
+    MATCHED: 'MATCHED',
+    CONFIRMED: 'CONFIRMED',
+    EXPIRED: 'EXPIRED',
+    CANCELLED: 'CANCELLED',
+  },
+
+  // Payment status
+  PAYMENT_STATUS: {
+    PENDING: 'PENDING',
+    COMPLETED: 'COMPLETED',
+    FAILED: 'FAILED',
+    REFUNDED: 'REFUNDED',
+  },
+
+  // Payout status
+  PAYOUT_STATUS: {
+    PENDING: 'PENDING',
+    APPROVED: 'APPROVED',
+    PROCESSING: 'PROCESSING',
+    COMPLETED: 'COMPLETED',
+    REJECTED: 'REJECTED',
+  },
+
+  // Notification types
+  NOTIFICATION_TYPES: {
+    SYSTEM: 'SYSTEM',
+    SESSION: 'SESSION',
+    PAYMENT: 'PAYMENT',
+    REVIEW: 'REVIEW',
+    MATCH: 'MATCH',
+    VERIFICATION: 'VERIFICATION',
+  },
+
+  // Days of week
+  DAYS_OF_WEEK: [
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+    'SUNDAY',
+  ],
+
+  // Payment settings
+  SESSION_PRICE: parseFloat(process.env.SESSION_PRICE) || 4000,
+  TUTOR_PERCENTAGE: parseFloat(process.env.TUTOR_PERCENTAGE) || 0.5,
+  PLATFORM_PERCENTAGE: parseFloat(process.env.PLATFORM_PERCENTAGE) || 0.5,
+  MIN_PAYOUT_AMOUNT: parseFloat(process.env.MIN_PAYOUT_AMOUNT) || 10000,
+
+  // File upload settings
+  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
+  ALLOWED_FILE_TYPES: ['image/jpeg', 'image/png', 'application/pdf'],
+
+  // Pagination
+  DEFAULT_PAGE_SIZE: 10,
+  MAX_PAGE_SIZE: 100,
+
+  // Match request
+  MATCH_REQUEST_EXPIRY_HOURS: parseInt(process.env.MATCH_REQUEST_EXPIRY_HOURS) || 24,
+  MAX_TUTORS_TO_NOTIFY: 10,
+};
+

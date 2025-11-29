@@ -1,0 +1,648 @@
+// Prisma Schema for Business Master - Tutor Management System
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER ROLES & AUTHENTICATION
+// ============================================
+
+enum UserRole {
+  ADMIN
+  TUTOR
+  PARENT
+  SUPERVISOR
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  role         UserRole
+  status       AccountStatus @default(PENDING)
+  isVerified   Boolean       @default(false)
+  lastLogin    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  // Relations
+  tutor        Tutor?
+  parent       Parent?
+  supervisor   Supervisor?
+  
+  // Auth tokens
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+  
+  @@index([email])
+  @@index([role, status])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([token])
+}
+
+// ============================================
+// TUTOR MANAGEMENT
+// ============================================
+
+enum TutorVerificationStatus {
+  PENDING_DOCUMENTS
+  DOCUMENTS_SUBMITTED
+  INTERVIEW_SCHEDULED
+  INTERVIEW_COMPLETED
+  APPROVED
+  REJECTED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model Tutor {
+  id                    String                   @id @default(uuid())
+  userId                String                   @unique
+  
+  // Personal Information
+  fullName              String
+  nicPassport           String                   @unique
+  phoneNumber           String
+  dateOfBirth           DateTime
+  address               String
+  city                  String
+  province              String
+  
+  // University Details
+  university            String
+  degree                String
+  graduationYear        Int
+  
+  // Verification Documents (Cloudinary URLs)
+  idDocumentUrl         String?
+  universityIdUrl       String?
+  
+  // Professional Details
+  yearsOfExperience     Int                      @default(0)
+  bio                   String?
+  
+  // Status & Verification
+  verificationStatus    TutorVerificationStatus  @default(PENDING_DOCUMENTS)
+  verifiedAt            DateTime?
+  verifiedBy            String?
+  rejectionReason       String?
+  
+  // Performance Metrics
+  performanceScore      Float                    @default(0.0)
+  totalClasses          Int                      @default(0)
+  completedClasses      Int                      @default(0)
+  averageRating         Float                    @default(0.0)
+  totalEarnings         Float                    @default(0.0)
+  availableBalance      Float                    @default(0.0)
+  
+  // Settings
+  isAvailable           Boolean                  @default(true)
+  maxStudentsPerWeek    Int                      @default(10)
+  
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  
+  // Relations
+  user                  User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects              TutorSubject[]
+  availability          TutorAvailability[]
+  sessions              Session[]
+  reviews               Review[]
+  payoutRequests        PayoutRequest[]
+  interviewSchedule     InterviewSchedule?
+  trainingProgress      TrainingProgress[]
+  badges                TutorBadge[]
+  
+  @@index([verificationStatus])
+  @@index([city])
+  @@index([performanceScore])
+}
+
+model TutorSubject {
+  id          String   @id @default(uuid())
+  tutorId     String
+  subjectId   String
+  gradeId     String
+  hourlyRate  Float    @default(2000.0) // Rs. 2000 per hour (4000 for 2 hours)
+  
+  tutor       Tutor    @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  grade       Grade    @relation(fields: [gradeId], references: [id])
+  
+  @@unique([tutorId, subjectId, gradeId])
+  @@index([tutorId])
+  @@index([subjectId, gradeId])
+}
+
+model TutorAvailability {
+  id          String    @id @default(uuid())
+  tutorId     String
+  dayOfWeek   DayOfWeek
+  startTime   String    // Format: "HH:mm" e.g., "14:00"
+  endTime     String    // Format: "HH:mm" e.g., "18:00"
+  isActive    Boolean   @default(true)
+  
+  tutor       Tutor     @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  
+  @@index([tutorId])
+  @@index([dayOfWeek])
+}
+
+model InterviewSchedule {
+  id              String    @id @default(uuid())
+  tutorId         String    @unique
+  supervisorId    String
+  scheduledAt     DateTime
+  meetingLink     String?
+  notes           String?
+  status          String    @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  interviewScore  Float?
+  feedback        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  tutor           Tutor      @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  supervisor      Supervisor @relation(fields: [supervisorId], references: [id])
+  
+  @@index([supervisorId])
+  @@index([scheduledAt])
+}
+
+model TrainingProgress {
+  id          String   @id @default(uuid())
+  tutorId     String
+  videoId     String
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  
+  tutor       Tutor    @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  
+  @@unique([tutorId, videoId])
+  @@index([tutorId])
+}
+
+model TutorBadge {
+  id          String   @id @default(uuid())
+  tutorId     String
+  badgeType   String   // TOP_PERFORMER, CONSISTENT, HIGHLY_RATED, etc.
+  awardedAt   DateTime @default(now())
+  
+  tutor       Tutor    @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  
+  @@index([tutorId])
+}
+
+// ============================================
+// PARENT & STUDENT MANAGEMENT
+// ============================================
+
+model Parent {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  
+  // Personal Information
+  fullName        String
+  phoneNumber     String
+  address         String
+  city            String
+  province        String
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students        Student[]
+  sessions        Session[]
+  payments        Payment[]
+  reviews         Review[]
+  complaints      Complaint[]
+  
+  @@index([city])
+}
+
+model Student {
+  id          String   @id @default(uuid())
+  parentId    String
+  
+  fullName    String
+  gradeId     String
+  school      String?
+  dateOfBirth DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  parent      Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  grade       Grade    @relation(fields: [gradeId], references: [id])
+  sessions    Session[]
+  
+  @@index([parentId])
+  @@index([gradeId])
+}
+
+// ============================================
+// SUPERVISOR MANAGEMENT
+// ============================================
+
+model Supervisor {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  fullName        String
+  phoneNumber     String
+  department      String?   // Quality Control, Training, etc.
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviews      InterviewSchedule[]
+  payoutApprovals PayoutRequest[]
+  audits          SessionAudit[]
+}
+
+// ============================================
+// SESSION MANAGEMENT
+// ============================================
+
+enum SessionStatus {
+  PENDING_MATCH
+  TUTOR_MATCHED
+  CONFIRMED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model Session {
+  id                String          @id @default(uuid())
+  tutorId           String
+  parentId          String
+  studentId         String
+  subjectId         String
+  gradeId           String
+  
+  // Session Details
+  sessionDate       DateTime
+  startTime         String          // Format: "HH:mm"
+  endTime           String          // Format: "HH:mm"
+  duration          Int             @default(120) // minutes
+  location          String
+  
+  // Status
+  status            SessionStatus   @default(PENDING_MATCH)
+  
+  // Attendance
+  attendanceMarked  Boolean         @default(false)
+  attendanceStatus  AttendanceStatus?
+  attendanceTime    DateTime?
+  
+  // Session Report
+  reportSubmitted   Boolean         @default(false)
+  reportUrl         String?         // Cloudinary URL
+  summary           String?
+  homework          String?
+  
+  // Payment
+  totalAmount       Float           @default(4000.0)
+  tutorAmount       Float           @default(2000.0)
+  platformAmount    Float           @default(2000.0)
+  isPaid            Boolean         @default(false)
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  tutor             Tutor           @relation(fields: [tutorId], references: [id])
+  parent            Parent          @relation(fields: [parentId], references: [id])
+  student           Student         @relation(fields: [studentId], references: [id])
+  subject           Subject         @relation(fields: [subjectId], references: [id])
+  grade             Grade           @relation(fields: [gradeId], references: [id])
+  payment           Payment?
+  review            Review?
+  audit             SessionAudit?
+  
+  @@index([tutorId])
+  @@index([parentId])
+  @@index([studentId])
+  @@index([status])
+  @@index([sessionDate])
+}
+
+model SessionAudit {
+  id            String     @id @default(uuid())
+  sessionId     String     @unique
+  supervisorId  String
+  auditScore    Float
+  comments      String?
+  auditedAt     DateTime   @default(now())
+  
+  session       Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  supervisor    Supervisor @relation(fields: [supervisorId], references: [id])
+  
+  @@index([supervisorId])
+}
+
+// ============================================
+// MATCHING SYSTEM
+// ============================================
+
+enum MatchRequestStatus {
+  PENDING
+  MATCHED
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+model MatchRequest {
+  id              String             @id @default(uuid())
+  parentId        String
+  studentId       String
+  subjectId       String
+  gradeId         String
+  
+  // Preferences
+  preferredCity   String
+  preferredTimes  Json               // Array of preferred time slots
+  additionalNotes String?
+  
+  // Matching
+  status          MatchRequestStatus @default(PENDING)
+  matchedTutorId  String?
+  matchedAt       DateTime?
+  confirmedAt     DateTime?
+  expiresAt       DateTime
+  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  
+  @@index([status])
+  @@index([matchedTutorId])
+  @@index([expiresAt])
+}
+
+// ============================================
+// PAYMENT SYSTEM
+// ============================================
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  CASH
+  ONLINE
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  sessionId       String        @unique
+  parentId        String
+  
+  amount          Float
+  paymentMethod   PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  
+  transactionId   String?
+  paymentDate     DateTime?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  session         Session       @relation(fields: [sessionId], references: [id])
+  parent          Parent        @relation(fields: [parentId], references: [id])
+  
+  @@index([parentId])
+  @@index([status])
+  @@index([paymentDate])
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+model PayoutRequest {
+  id              String       @id @default(uuid())
+  tutorId         String
+  
+  amount          Float
+  bankDetails     Json         // Bank account information
+  status          PayoutStatus @default(PENDING)
+  
+  requestedAt     DateTime     @default(now())
+  approvedBy      String?
+  approvedAt      DateTime?
+  completedAt     DateTime?
+  rejectionReason String?
+  
+  tutor           Tutor        @relation(fields: [tutorId], references: [id])
+  supervisor      Supervisor?  @relation(fields: [approvedBy], references: [id])
+  
+  @@index([tutorId])
+  @@index([status])
+}
+
+// ============================================
+// REVIEW & FEEDBACK
+// ============================================
+
+model Review {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  tutorId     String
+  parentId    String
+  
+  rating      Float    // 1-5 stars
+  comment     String?
+  
+  // Rating breakdown
+  punctuality Int      // 1-5
+  knowledge   Int      // 1-5
+  teaching    Int      // 1-5
+  behavior    Int      // 1-5
+  
+  createdAt   DateTime @default(now())
+  
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tutor       Tutor    @relation(fields: [tutorId], references: [id])
+  parent      Parent   @relation(fields: [parentId], references: [id])
+  
+  @@index([tutorId])
+  @@index([rating])
+}
+
+model Complaint {
+  id          String   @id @default(uuid())
+  parentId    String
+  tutorId     String?
+  sessionId   String?
+  
+  subject     String
+  description String
+  status      String   @default("PENDING") // PENDING, IN_PROGRESS, RESOLVED, CLOSED
+  resolution  String?
+  resolvedAt  DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  parent      Parent   @relation(fields: [parentId], references: [id])
+  
+  @@index([status])
+  @@index([parentId])
+}
+
+// ============================================
+// SUBJECTS & GRADES
+// ============================================
+
+model Subject {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  description String?
+  isActive    Boolean        @default(true)
+  
+  tutorSubjects TutorSubject[]
+  sessions      Session[]
+  
+  @@index([isActive])
+}
+
+model Grade {
+  id          String         @id @default(uuid())
+  name        String         @unique // Grade 1-13, O/L, A/L
+  level       String         // PRIMARY, SECONDARY, ADVANCED
+  isActive    Boolean        @default(true)
+  
+  tutorSubjects TutorSubject[]
+  students      Student[]
+  sessions      Session[]
+  
+  @@index([level, isActive])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationType {
+  SYSTEM
+  SESSION
+  PAYMENT
+  REVIEW
+  MATCH
+  VERIFICATION
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  metadata  Json?            // Additional data
+  
+  createdAt DateTime         @default(now())
+  
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// ============================================
+// MARKETING & ANALYTICS
+// ============================================
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  imageUrl    String   // Cloudinary URL
+  link        String?
+  position    String   // HOME, DASHBOARD, etc.
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([isActive, position])
+}
+
+model Referral {
+  id           String   @id @default(uuid())
+  referrerId   String   // User who referred
+  referredId   String   // User who was referred
+  referralCode String   @unique
+  status       String   @default("PENDING") // PENDING, COMPLETED
+  reward       Float    @default(0.0)
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([referrerId])
+  @@index([referralCode])
+}
+
+model SystemSettings {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+  
+  updatedAt DateTime @updatedAt
+}
+
